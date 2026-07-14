@@ -1,15 +1,13 @@
 from sqlalchemy.orm import Session
-from app.core.config import OPENAI_API_KEY
+from app.core.config import CHAT_PROVIDER, OPENAI_API_KEY, ANTHROPIC_API_KEY
 from app.modules.posts.service import get_post_context_for_chat
 
-IS_ANTHROPIC = OPENAI_API_KEY.startswith("sk-ant-")
-
-if IS_ANTHROPIC:
-    from anthropic import Anthropic
-    client = Anthropic(api_key=OPENAI_API_KEY)
-else:
+if CHAT_PROVIDER == "openai":
     from openai import OpenAI
     client = OpenAI(api_key=OPENAI_API_KEY)
+else:
+    from anthropic import Anthropic
+    client = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 def get_festival_context(db: Session) -> tuple[str, list[int]]:
@@ -29,8 +27,20 @@ def get_festival_context(db: Session) -> tuple[str, list[int]]:
 
 
 def call_llm(system_prompt: str, history: list, message: str) -> str:
-    """OpenAI든 Anthropic이든 같은 인터페이스로 호출"""
-    if IS_ANTHROPIC:
+    """CHAT_PROVIDER가 openai든 anthropic이든 같은 인터페이스로 호출"""
+    if CHAT_PROVIDER == "openai":
+        messages = [{"role": "system", "content": system_prompt}]
+        for h in history:
+            messages.append({"role": h.role, "content": h.content})
+        messages.append({"role": "user", "content": message})
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            timeout=15,
+        )
+        return response.choices[0].message.content
+    else:
         messages = []
         for h in history:
             messages.append({"role": h.role, "content": h.content})
@@ -44,18 +54,6 @@ def call_llm(system_prompt: str, history: list, message: str) -> str:
             timeout=15,
         )
         return response.content[0].text
-    else:
-        messages = [{"role": "system", "content": system_prompt}]
-        for h in history:
-            messages.append({"role": h.role, "content": h.content})
-        messages.append({"role": "user", "content": message})
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            timeout=15,
-        )
-        return response.choices[0].message.content
 
 
 def get_chat_response(message: str, history: list, db: Session) -> tuple[str, list[int]]:
