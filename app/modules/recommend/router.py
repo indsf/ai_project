@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from database import get_db
-from schemas.chat import ChatRequest, ChatResponse
-from services.chat_service import get_chat_response
+from app.core.database import get_db
+from app.modules.recommend.schemas import ChatRequest, ChatResponse
+from app.modules.recommend.chat_service import get_chat_response
 
 router = APIRouter(prefix="/api", tags=["chat"])
+
 
 @router.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest, db: Session = Depends(get_db)):

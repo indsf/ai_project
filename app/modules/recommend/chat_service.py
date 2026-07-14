@@ -1,34 +1,19 @@
-import os
-from datetime import date
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from models import Post
+from app.core.config import OPENAI_API_KEY
+from app.modules.posts.service import get_post_context_for_chat
 
-RAW_KEY = os.getenv("OPENAI_API_KEY", "")
-IS_ANTHROPIC = RAW_KEY.startswith("sk-ant-")
+IS_ANTHROPIC = OPENAI_API_KEY.startswith("sk-ant-")
 
 if IS_ANTHROPIC:
     from anthropic import Anthropic
-    client = Anthropic(api_key=RAW_KEY)
+    client = Anthropic(api_key=OPENAI_API_KEY)
 else:
     from openai import OpenAI
-    client = OpenAI(api_key=RAW_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def get_festival_context(db: Session) -> tuple[str, list[int]]:
-    today = date.today()
-    posts = (
-        db.query(Post)
-        .filter(
-            or_(
-                Post.category == "spot",
-                Post.end_date >= today,
-                Post.end_date.is_(None),
-            )
-        )
-        .limit(15)
-        .all()
-    )
+    posts = get_post_context_for_chat(db)
 
     if not posts:
         return "현재 등록된 축제·관광지 정보가 없습니다.", []
