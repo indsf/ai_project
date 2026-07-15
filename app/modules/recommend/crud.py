@@ -11,17 +11,11 @@ def get_nearest_weather(
     db: Session,
     target_at: datetime,
 ) -> WeatherForecast | None:
-    """
-    target_at 이후의 예보 중 가장 가까운 예보를 조회한다.
-    """
+    """target_at 이후의 예보 중 가장 가까운 예보를 조회한다."""
     return (
         db.query(WeatherForecast)
-        .filter(
-            WeatherForecast.forecast_at >= target_at,
-        )
-        .order_by(
-            WeatherForecast.forecast_at.asc(),
-        )
+        .filter(WeatherForecast.forecast_at >= target_at)
+        .order_by(WeatherForecast.forecast_at.asc())
         .first()
     )
 
@@ -33,11 +27,8 @@ def get_forecasts_range(
     start_at: datetime,
     days: int = 7,
 ) -> list[WeatherForecast]:
-    """
-    start_at부터 days일 이내의 모든 예보를 시간순으로 조회한다.
-    """
+    """start_at부터 days일 이내의 모든 예보를 시간순으로 조회한다. (챗봇 7일 날씨 조회용)"""
     end_at = start_at + timedelta(days=days)
-
     return (
         db.query(WeatherForecast)
         .filter(
@@ -57,8 +48,7 @@ def save_weather_forecasts(
 ) -> list[WeatherForecast]:
     """
     시간대별 예보를 저장한다.
-    동일한 지역과 예보 시각이 없으면 INSERT하고,
-    이미 존재하면 최신 발표 예보로 UPDATE한다.
+    동일한 지역과 예보 시각이 없으면 INSERT하고, 이미 존재하면 최신 발표 예보로 UPDATE한다.
     """
     saved_forecasts: list[WeatherForecast] = []
     try:
@@ -68,15 +58,12 @@ def save_weather_forecasts(
                 .filter(
                     WeatherForecast.nx == data["nx"],
                     WeatherForecast.ny == data["ny"],
-                    WeatherForecast.forecast_at
-                    == data["forecast_at"],
+                    WeatherForecast.forecast_at == data["forecast_at"],
                 )
                 .first()
             )
             if weather is None:
-                print(
-                    f"[INSERT] {data['forecast_at']}"
-                )
+                print(f"[INSERT] {data['forecast_at']}")
                 weather = WeatherForecast(**data)
                 db.add(weather)
             else:
@@ -85,18 +72,11 @@ def save_weather_forecasts(
                 weather.rain_prob = data["rain_prob"]
                 weather.rain_type = data["rain_type"]
                 weather.sky_type = data["sky_type"]
-                changed = db.is_modified(
-                    weather,
-                    include_collections=False,
-                )
+                changed = db.is_modified(weather, include_collections=False)
                 if changed:
-                    print(
-                        f"[UPDATE] {data['forecast_at']}"
-                    )
+                    print(f"[UPDATE] {data['forecast_at']}")
                 else:
-                    print(
-                        f"[UNCHANGED] {data['forecast_at']}"
-                    )
+                    print(f"[UNCHANGED] {data['forecast_at']}")
             saved_forecasts.append(weather)
         db.commit()
         for weather in saved_forecasts:

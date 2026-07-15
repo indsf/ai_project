@@ -9,6 +9,7 @@ from app.core.config import CHAT_PROVIDER, OPENAI_API_KEY, ANTHROPIC_API_KEY
 from app.modules.posts.service import get_post_context_for_chat
 from app.modules.places.service import get_places_for_recommendation
 from app.modules.recommend.service import get_current_weather_context, DEFAULT_NX, DEFAULT_NY
+from app.modules.recommend.weather_normalizer import weather_to_place_tags
 from app.modules.recommend import crud as weather_crud
 
 if CHAT_PROVIDER == "openai":
@@ -35,14 +36,6 @@ CATEGORY_KEYWORDS = {
     "액티비티": "leisure",
     "문화시설": "culture",
     "여행코스": "courses",
-}
-
-NORMALIZED_TO_TAG = {
-    "RAIN": ["rain"],
-    "SNOW": ["indoor"],
-    "HOT": ["hot"],
-    "COLD": ["cold"],
-    "NORMAL": None,
 }
 
 RAIN_TYPE_LABEL = {
@@ -118,7 +111,7 @@ def get_place_context(db: Session, message: str, normalized_weather: str | None)
             matched_slug = slug
             break
 
-    weather_tags = NORMALIZED_TO_TAG.get(normalized_weather) if normalized_weather else None
+    weather_tags = weather_to_place_tags(normalized_weather) if normalized_weather else None
 
     places = get_places_for_recommendation(
         db,
