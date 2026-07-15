@@ -60,7 +60,7 @@ class WeatherForecast(Base):
         nullable=False,
     )
 
-    # 실제 예보 대상 시각
+    # 실제 예보 대상 시각(예측 일자 + 예측 시간)
     # fcstDate + fcstTime
     forecast_at = Column(
         DateTime,
@@ -68,13 +68,13 @@ class WeatherForecast(Base):
         index=True,
     )
 
-    # TMP
+    # TMP(온도)
     temperature = Column(
         Float,
         nullable=True,
     )
 
-    # POP
+    # POP(강수확률)
     rain_prob = Column(
         Integer,
         nullable=True,

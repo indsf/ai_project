@@ -6,7 +6,12 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
+from app.modules.recommend import crud
 
+# 추천 날씨 정규화 
+from app.modules.recommend.weather_normalizer import (
+    normalize_weather,
+)
 from app.modules.recommend import crud, weather_client
 
 
@@ -34,6 +39,42 @@ RAIN_TYPE_MAP = {
     "3": "SNOW",
     "4": "SHOWER",
 }
+
+def get_current_weather_context(
+    db: Session,
+) -> dict:
+    """
+    현재 시각과 가장 가까운 날씨를 조회한 뒤
+    추천에 사용할 날씨 정보로 변환한다.
+    """
+
+    now_kst = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).replace(tzinfo=None)
+
+    weather = crud.get_nearest_weather(
+        db=db,
+        target_at=now_kst,
+    )
+
+    if weather is None:
+        raise ValueError(
+            "현재 시각 이후의 예보가 없습니다."
+        )
+
+    normalized_weather = normalize_weather(
+        temperature=weather.temperature,
+        rain_type=weather.rain_type,
+    )
+
+    return {
+        "weather_id": weather.id,
+        "forecast_at": weather.forecast_at,
+        "temperature": weather.temperature,
+        "rain_prob": weather.rain_prob,
+        "rain_type": weather.rain_type,
+        "normalized_weather": normalized_weather,
+    }
 
 
 def get_latest_base_date_time(
@@ -327,8 +368,12 @@ if __name__ == "__main__":
 
     Base.metadata.create_all(bind=engine)
 
+    
+
     async def test():
         db = SessionLocal()
+        
+
 
         try:
             print(
@@ -361,6 +406,16 @@ if __name__ == "__main__":
                 )
                 print(
                     f"강수형태: {result.rain_type}"
+                )
+                weather_context = get_current_weather_context(db)
+                print("현재 추천용 날씨")
+                print(f"예보 시각: {weather_context['forecast_at']}")
+                print(f"기온: {weather_context['temperature']}℃")
+                print(f"강수확률: {weather_context['rain_prob']}%")
+                print(f"강수형태: {weather_context['rain_type']}")
+                print(
+                    f"추천용 날씨: "
+                    f"{weather_context['normalized_weather']}"
                 )
 
         finally:
