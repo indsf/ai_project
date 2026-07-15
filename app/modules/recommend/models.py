@@ -58,6 +58,7 @@ class WeatherForecast(Base):
     base_datetime = Column(
         DateTime,
         nullable=False,
+        index=True
     )
 
     # 실제 예보 대상 시각(예측 일자 + 예측 시간)
@@ -86,6 +87,15 @@ class WeatherForecast(Base):
         String(20),
         nullable=False,
         default="NONE",
+    )
+
+    # SKY: 하늘 상태(구름,구름 많음 등~~)
+    # CLEAR, MOSTLY_CLOUDY, OVERCAST, UNKNOWN
+    sky_type = Column(
+        String(20),
+        nullable=False,
+        default="UNKNOWN",
+        server_default="UNKNOWN",
     )
 
     # 우리 DB에 저장된 시각
