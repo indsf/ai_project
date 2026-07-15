@@ -149,6 +149,7 @@ class PlaceSummary:
         self.mapy = place.mapy
         self.image_url = place.image_url
         self.tags = place.tags
+        self.distance_km = getattr(place, "distance_km", None)
 
 
 def get_places_for_recommendation(
