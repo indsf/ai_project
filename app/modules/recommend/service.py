@@ -11,6 +11,7 @@ from app.modules.recommend import crud
 # 추천 날씨 정규화 
 from app.modules.recommend.weather_normalizer import (
     normalize_weather,
+    weather_to_place_tags   
 )
 from app.modules.recommend import crud, weather_client
 
@@ -55,6 +56,7 @@ def get_current_weather_context(
     추천에 사용할 날씨 정보로 변환한다.
     """
 
+    # 현재 시간 기준 
     now_kst = datetime.now(
         ZoneInfo("Asia/Seoul")
     ).replace(tzinfo=None)
@@ -71,7 +73,13 @@ def get_current_weather_context(
 
     normalized_weather = normalize_weather(
         temperature=weather.temperature,
+        rain_prob=weather.rain_prob,
         rain_type=weather.rain_type,
+        sky_type=weather.sky_type,
+    )
+
+    place_tags = weather_to_place_tags(
+        normalized_weather,
     )
 
     return {
@@ -82,6 +90,7 @@ def get_current_weather_context(
         "rain_type": weather.rain_type,
         "sky_type": weather.sky_type,
         "normalized_weather": normalized_weather,
+        "place_tags": place_tags,
     }
 
 
@@ -432,15 +441,45 @@ if __name__ == "__main__":
                 )
 
             weather_context = get_current_weather_context(db)
+            place_tags = weather_context["place_tags"]
+            tags_text = ",".join(place_tags)
+
+            print("============================")
             print("현재 추천용 날씨")
-            print(f"예보 시각: {weather_context['forecast_at']}")
-            print(f"기온: {weather_context['temperature']}℃")
-            print(f"강수확률: {weather_context['rain_prob']}%")
-            print(f"강수형태: {weather_context['rain_type']}")    
-            print(f"하늘상태: {weather_context['sky_type']}")
+            print("============================")
+            print(
+                f"예보 시각: "
+                f"{weather_context['forecast_at']}"
+            )
+            print(
+                f"기온: "
+                f"{weather_context['temperature']}℃"
+            )
+            print(
+                f"강수확률: "
+                f"{weather_context['rain_prob']}%"
+            )
+            print(
+                f"강수형태: "
+                f"{weather_context['rain_type']}"
+            )
+            print(
+                f"하늘상태: "
+                f"{weather_context['sky_type']}"
+            )
             print(
                 f"추천용 날씨: "
                 f"{weather_context['normalized_weather']}"
+            )
+            print(
+                f"장소 검색 태그: "
+                f"{place_tags}"
+            )
+            print(
+                "축제 조회 조건: "
+                f"category=festivals, "
+                f"tags={tags_text}, "
+                "match=any"
             )
 
         finally:

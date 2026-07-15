@@ -127,6 +127,12 @@ class PlaceSummary:
         self.mapy = place.mapy
         self.image_url = place.image_url
         self.tags = place.tags
+        #자신의 현재 위치 거리
+        self.distance_km = getattr(
+            place,
+            "distance_km",
+            None,
+        )
 
 
 def get_places_for_recommendation(

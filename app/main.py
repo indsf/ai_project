@@ -1,22 +1,7 @@
 # app/main.py
 from fastapi import FastAPI
-from app.core.database import engine, Base
-
-# 앱 모듈 임포트
-from app.modules.recommend import models as recommend_models
-from app.modules.recommend.router import router as recommend_router
-
-# DB 테이블 생성
-Base.metadata.create_all(bind=engine)
-
-# 서버 애플리케이션 객체 생성
-app = FastAPI(title="해커톤 날씨 추천 API")
-
-# 💡 여기에 아까 만든 라우터(창구)를 꽂아줍니다!
-app.include_router(recommend_router)
-# app/main.py
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 
 from app.core.database import Base, SessionLocal, engine
 from app.core.weather_tags import tag_docs_table
@@ -32,8 +17,8 @@ from app.modules.places.router import router as places_router
 from app.modules.places.service import seed_all as seed_places
 
 # ── weater_feature 브랜치 병합 후 아래 두 줄의 주석을 해제하세요 ──────────────
-# from app.modules.recommend import models as recommend_models
-# from app.modules.recommend.router import router as recommend_router
+from app.modules.recommend import models as recommend_models
+from app.modules.recommend.router import router as recommend_router
 
 
 API_DESCRIPTION = f"""
@@ -65,6 +50,12 @@ API_DESCRIPTION = f"""
 또는 `match=all`(전부 맞아야 포함)로 조합 방식을 고를 수 있습니다.
 """.strip()
 
+# DB 테이블 생성
+Base.metadata.create_all(bind=engine)
+
+# 서버 애플리케이션 객체 생성
+
+
 app = FastAPI(
     title="LocalHub API",
     description=API_DESCRIPTION,
@@ -80,7 +71,7 @@ app.add_middleware(
 
 app.include_router(posts_router)
 app.include_router(places_router)
-# app.include_router(recommend_router)
+app.include_router(recommend_router)
 
 
 @app.on_event("startup")
