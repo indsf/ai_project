@@ -1,14 +1,12 @@
 # app/modules/recommend/crud.py
 
-
 from datetime import datetime
-from sqlalchemy.orm import Session
-from app.modules.recommend.models import WeatherForecast
-from app.modules.recommend.models import (
-    WeatherForecast,
-)
 
-# 사용자 요청 -> 가장 가까운 예보를 가져오기 함수
+from sqlalchemy.orm import Session
+
+from app.modules.recommend.models import WeatherForecast
+
+
 def get_nearest_weather(
     db: Session,
     target_at: datetime,
@@ -28,13 +26,19 @@ def get_nearest_weather(
         .first()
     )
 
-# 날씨 관련 데이터베이스(읽기,쓰기) 담당 ->  DB저장
+
 def save_weather_forecasts(
     db: Session,
     forecasts: list[dict],
 ) -> list[WeatherForecast]:
+    """
+    시간대별 예보를 저장한다.
 
-    saved_forecasts = []
+    동일한 지역과 예보 시각이 없으면 INSERT하고,
+    이미 존재하면 최신 발표 예보로 UPDATE한다.
+    """
+
+    saved_forecasts: list[WeatherForecast] = []
 
     try:
         for data in forecasts:
@@ -51,34 +55,32 @@ def save_weather_forecasts(
 
             if weather is None:
                 print(
-                    f"INSERT: {data['forecast_at']}"
+                    f"[INSERT] {data['forecast_at']}"
                 )
 
                 weather = WeatherForecast(**data)
                 db.add(weather)
 
-            else:            
-                print(
-                    f"UPDATE 대상: {data['forecast_at']}"
-                )
-
+            else:
                 weather.base_datetime = data["base_datetime"]
                 weather.temperature = data["temperature"]
                 weather.rain_prob = data["rain_prob"]
                 weather.rain_type = data["rain_type"]
+                weather.sky_type = data["sky_type"]
 
-                if "normalized_weather" in data:
-                    weather.normalized_weather = (
-                        data["normalized_weather"]
-                    )
-
-                print(
-                    "실제 변경 여부:",
-                    db.is_modified(
-                        weather,
-                        include_collections=False,
-                    ),
+                changed = db.is_modified(
+                    weather,
+                    include_collections=False,
                 )
+
+                if changed:
+                    print(
+                        f"[UPDATE] {data['forecast_at']}"
+                    )
+                else:
+                    print(
+                        f"[UNCHANGED] {data['forecast_at']}"
+                    )
 
             saved_forecasts.append(weather)
 
@@ -92,4 +94,3 @@ def save_weather_forecasts(
     except Exception:
         db.rollback()
         raise
-

@@ -40,6 +40,13 @@ RAIN_TYPE_MAP = {
     "4": "SHOWER",
 }
 
+# 단기예보 SKY 코드 설명
+SKY_TYPE_MAP = {
+    "1": "CLEAR",
+    "3": "MOSTLY_CLOUDY",
+    "4": "OVERCAST",
+}
+
 def get_current_weather_context(
     db: Session,
 ) -> dict:
@@ -73,6 +80,7 @@ def get_current_weather_context(
         "temperature": weather.temperature,
         "rain_prob": weather.rain_prob,
         "rain_type": weather.rain_type,
+        "sky_type": weather.sky_type,
         "normalized_weather": normalized_weather,
     }
 
@@ -149,7 +157,12 @@ def parse_weather_items(
         forecast_time = item.get("fcstTime")
         forecast_value = item.get("fcstValue")
 
-        if category not in {"TMP", "POP", "PTY"}:
+        if category not in {
+            "TMP",
+            "POP",
+            "PTY",
+            "SKY",
+        }:
             continue
 
         if not forecast_date or not forecast_time:
@@ -180,6 +193,7 @@ def parse_weather_items(
             "TMP",
             "POP",
             "PTY",
+            "SKY",
         }
 
         if not required_categories.issubset(values):
@@ -201,6 +215,11 @@ def parse_weather_items(
             raw_rain_type,
             "UNKNOWN",
         )
+        
+        sky_type = SKY_TYPE_MAP.get(
+            str(values.get("SKY")),
+            "UNKNOWN",
+        )
 
         forecasts.append(
             {
@@ -211,6 +230,7 @@ def parse_weather_items(
                 "temperature": temperature,
                 "rain_prob": rain_prob,
                 "rain_type": rain_type,
+                "sky_type": sky_type,
             }
         )
 
@@ -407,16 +427,21 @@ if __name__ == "__main__":
                 print(
                     f"강수형태: {result.rain_type}"
                 )
-                weather_context = get_current_weather_context(db)
-                print("현재 추천용 날씨")
-                print(f"예보 시각: {weather_context['forecast_at']}")
-                print(f"기온: {weather_context['temperature']}℃")
-                print(f"강수확률: {weather_context['rain_prob']}%")
-                print(f"강수형태: {weather_context['rain_type']}")
                 print(
-                    f"추천용 날씨: "
-                    f"{weather_context['normalized_weather']}"
+                    f"하늘상태: {result.sky_type}"
                 )
+
+            weather_context = get_current_weather_context(db)
+            print("현재 추천용 날씨")
+            print(f"예보 시각: {weather_context['forecast_at']}")
+            print(f"기온: {weather_context['temperature']}℃")
+            print(f"강수확률: {weather_context['rain_prob']}%")
+            print(f"강수형태: {weather_context['rain_type']}")    
+            print(f"하늘상태: {weather_context['sky_type']}")
+            print(
+                f"추천용 날씨: "
+                f"{weather_context['normalized_weather']}"
+            )
 
         finally:
             db.close()
