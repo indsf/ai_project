@@ -1,21 +1,33 @@
+# app/core/config.py
+
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
+# 프로젝트 루트의 .env 파일을 읽는다.
 load_dotenv()
 
+# 장소 관련 data_read
+PLACES_DATA_DIR = Path(
+    os.getenv(
+        "PLACES_DATA_DIR",
+        str(Path(__file__).resolve().parent.parent / "data"),
+    )
+)
+
+# 날씨 관련 api키
+KMA_API_KEY = os.getenv("KMA_API_KEY")
+
+if not KMA_API_KEY:
+    raise RuntimeError(
+        "KMA_API_KEY 환경변수가 설정되지 않았습니다. "
+        "프로젝트 루트의 .env 파일을 확인하세요."
+    )
+
+# 챗봇 관련 설정
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./localhub.db")
 
-# "openai" | "anthropic" — 팀 공식 OpenAI 키가 오면 .env에서 값만 바꾸면 전환됨
 CHAT_PROVIDER = os.getenv("CHAT_PROVIDER", "anthropic")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-
-# 기상청 단기예보 API 인증키
-KMA_API_KEY = os.getenv("KMA_API_KEY", "")
-
-# 축제 데이터(TourAPI) 시드 파일 경로
-FESTIVAL_DATA_PATH = (
-    Path(__file__).resolve().parent.parent.parent
-    / "data" / "tourapi" / "구미_경북권_축제공연행사.json"
-)

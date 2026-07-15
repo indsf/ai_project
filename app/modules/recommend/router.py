@@ -1,42 +1,35 @@
-from fastapi import APIRouter, Depends, HTTPException
+# app/modules/recommend/router.py
+
+# front 요청 시 날씨 파이프라인 통신 연결 담당 (HTTP 요청·응답)
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.recommend.schemas import ChatRequest, ChatResponse, WeatherForecastResponse
-from app.modules.recommend.chat_service import get_chat_response
-from app.modules.recommend import weather_crud, weather_service
+from app.modules.recommend import service
 
-router = APIRouter(prefix="/api", tags=["chat"])
-
-
-@router.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest, db: Session = Depends(get_db)):
-    if not request.message.strip():
-        raise HTTPException(status_code=400, detail="메시지를 입력해주세요.")
-    try:
-        reply, related_ids = get_chat_response(request.message, request.history, db)
-    except Exception as e:
-        print("Chat error:", e)
-        raise HTTPException(status_code=500, detail="챗봇 응답 생성에 실패했습니다. 잠시 후 다시 시도해주세요.")
-    return ChatResponse(reply=reply, related_post_ids=related_ids)
+router = APIRouter(
+    prefix="/api/recommend",
+    tags=["Recommend"]  # 나중에 Swagger(API 문서)에서 예쁘게 그룹화해 줍니다.
+)
 
 
-@router.post("/weather/refresh", response_model=list[WeatherForecastResponse])
-async def refresh_weather(db: Session = Depends(get_db)):
-    """기상청 API를 호출해 최신 날씨를 DB에 저장하고 반환한다."""
-    try:
-        forecasts = await weather_service.process_and_save_weather(db=db)
-    except ValueError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    return forecasts
+@router.get("/weather")
+async def get_weather_recommendation(nx: int = 87, ny: int = 90, db: Session = Depends(get_db)):
+    """
+    기상청에서 현재 날씨를 가져와 DB에 저장하고, 프론트엔드에 필요한 데이터만 반환합니다.
+    """
+    # 아까 만든 파이프라인(service) 호출 - 여러 시간대 예보 리스트가 반환됨
+    saved_weather = await service.process_and_save_weather(db, nx=nx, ny=ny)
+    latest = saved_weather[0]
 
-
-@router.get("/weather", response_model=list[WeatherForecastResponse])
-def get_weather(db: Session = Depends(get_db)):
-    """DB에 저장된 최신 날씨 예보를 조회한다."""
-    forecasts = weather_crud.get_forecasts(
-        db=db,
-        nx=weather_service.DEFAULT_NX,
-        ny=weather_service.DEFAULT_NY,
-    )
-    return forecasts
+    # 프론트엔드 개발자가 파싱하기 딱 좋은 깔끔한 JSON 형태로 응답
+    return {
+        "message": "구미 날씨 조회 및 적재 성공",
+        "data": {
+            "id": latest.id,
+            "temperature": latest.temperature,
+            "rain_prob": latest.rain_prob,
+            "rain_type": latest.rain_type,
+            "sky_type": latest.sky_type,
+        }
+    }

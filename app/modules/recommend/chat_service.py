@@ -1,15 +1,15 @@
 # app/modules/recommend/chat_service.py
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from sqlalchemy.orm import Session
 
 from app.core.config import CHAT_PROVIDER, OPENAI_API_KEY, ANTHROPIC_API_KEY
 from app.modules.posts.service import get_post_context_for_chat
-from app.modules.recommend.place_crud import (
-    search_places,
-    get_places_by_category,
-    get_places_sample,
-)
-from app.modules.recommend import weather_crud, weather_service
+from app.modules.places.service import get_places_for_recommendation
+from app.modules.recommend.service import get_current_weather_context, DEFAULT_NX, DEFAULT_NY
+from app.modules.recommend import crud as weather_crud
 
 if CHAT_PROVIDER == "openai":
     from openai import OpenAI
@@ -20,21 +20,29 @@ else:
 
 
 CATEGORY_KEYWORDS = {
-    "축제": "15",
-    "공연": "15",
-    "행사": "15",
-    "관광지": "12",
-    "관광": "12",
-    "음식": "39",
-    "맛집": "39",
-    "먹거리": "39",
-    "숙박": "32",
-    "호텔": "32",
-    "쇼핑": "38",
-    "레포츠": "28",
-    "액티비티": "28",
-    "문화시설": "14",
-    "여행코스": "25",
+    "축제": "festivals",
+    "공연": "festivals",
+    "행사": "festivals",
+    "관광지": "attractions",
+    "관광": "attractions",
+    "음식": "restaurants",
+    "맛집": "restaurants",
+    "먹거리": "restaurants",
+    "숙박": "lodging",
+    "호텔": "lodging",
+    "쇼핑": "shopping",
+    "레포츠": "leisure",
+    "액티비티": "leisure",
+    "문화시설": "culture",
+    "여행코스": "courses",
+}
+
+NORMALIZED_TO_TAG = {
+    "RAIN": ["rain"],
+    "SNOW": ["indoor"],
+    "HOT": ["hot"],
+    "COLD": ["cold"],
+    "NORMAL": None,
 }
 
 RAIN_TYPE_LABEL = {
@@ -47,7 +55,7 @@ RAIN_TYPE_LABEL = {
 
 
 def get_post_context(db: Session) -> tuple[str, list[int]]:
-    """사용자가 작성한 커뮤니티 게시글(축제/관광/맛집 정보) 컨텍스트"""
+    """사용자가 작성한 커뮤니티 게시글 컨텍스트"""
     posts = get_post_context_for_chat(db)
 
     if not posts:
@@ -64,18 +72,60 @@ def get_post_context(db: Session) -> tuple[str, list[int]]:
     return "\n".join(lines), ids
 
 
-def get_place_context(db: Session, message: str) -> str:
-    """공공데이터(TourAPI) 기반 관광지/맛집/축제 정보 컨텍스트"""
-    matched_type_id = None
-    for kw, type_id in CATEGORY_KEYWORDS.items():
+def get_weather_context(db: Session) -> tuple[str, str | None]:
+    """구미 지역 향후 7일 날씨 컨텍스트. (텍스트, 현재 시점 정규화 날씨) 반환."""
+    now_kst = datetime.now(ZoneInfo("Asia/Seoul")).replace(tzinfo=None)
+    forecasts = weather_crud.get_forecasts_range(db, DEFAULT_NX, DEFAULT_NY, now_kst, days=7)
+
+    if not forecasts:
+        return "현재 저장된 날씨 예보 데이터가 없습니다.", None
+
+    by_date: dict[str, list] = {}
+    for f in forecasts:
+        date_key = f.forecast_at.strftime("%m/%d")
+        by_date.setdefault(date_key, []).append(f)
+
+    lines = []
+    for date_key, day_forecasts in by_date.items():
+        rain_forecasts = [f for f in day_forecasts if f.rain_type != "NONE"]
+        temps = [f.temperature for f in day_forecasts if f.temperature is not None]
+        max_temp = max(temps) if temps else None
+        min_temp = min(temps) if temps else None
+
+        if rain_forecasts:
+            rain_hours = ", ".join(f.forecast_at.strftime("%H시") for f in rain_forecasts)
+            rain_label = RAIN_TYPE_LABEL.get(rain_forecasts[0].rain_type, rain_forecasts[0].rain_type)
+            lines.append(f"- {date_key}: 최고 {max_temp}℃/최저 {min_temp}℃, {rain_hours}에 {rain_label} 예보")
+        else:
+            lines.append(f"- {date_key}: 최고 {max_temp}℃/최저 {min_temp}℃, 비 소식 없음")
+
+    text = "\n".join(lines)
+
+    try:
+        current = get_current_weather_context(db)
+        normalized = current["normalized_weather"]
+    except ValueError:
+        normalized = None
+
+    return text, normalized
+
+
+def get_place_context(db: Session, message: str, normalized_weather: str | None) -> str:
+    """장소(TourAPI) + 현재 날씨 태그 기반 추천 컨텍스트"""
+    matched_slug = None
+    for kw, slug in CATEGORY_KEYWORDS.items():
         if kw in message:
-            matched_type_id = type_id
+            matched_slug = slug
             break
 
-    if matched_type_id:
-        places = get_places_by_category(db, matched_type_id, limit=10)
-    else:
-        places = search_places(db, message, limit=10) or get_places_sample(db, limit=5)
+    weather_tags = NORMALIZED_TO_TAG.get(normalized_weather) if normalized_weather else None
+
+    places = get_places_for_recommendation(
+        db,
+        categories=[matched_slug] if matched_slug else None,
+        tags=weather_tags,
+        limit=10,
+    )
 
     if not places:
         return "관련된 공공 관광정보를 찾지 못했습니다."
@@ -83,34 +133,12 @@ def get_place_context(db: Session, message: str) -> str:
     lines = []
     for place in places:
         addr = place.addr1 or "주소 미정"
-        lines.append(f"- {place.title} / {addr} / 전화: {place.tel or '정보 없음'}")
-
-    return "\n".join(lines)
-
-
-def get_weather_context(db: Session) -> str:
-    """구미 지역 최신 단기예보 컨텍스트"""
-    forecasts = weather_crud.get_forecasts(
-        db=db,
-        nx=weather_service.DEFAULT_NX,
-        ny=weather_service.DEFAULT_NY,
-        limit=8,
-    )
-
-    if not forecasts:
-        return "현재 저장된 날씨 예보 데이터가 없습니다."
-
-    lines = []
-    for f in forecasts:
-        time_label = f.forecast_at.strftime("%m/%d %H시")
-        rain_label = RAIN_TYPE_LABEL.get(f.rain_type, f.rain_type)
-        lines.append(f"- {time_label}: 기온 {f.temperature}℃, 강수확률 {f.rain_prob}%, {rain_label}")
+        lines.append(f"- {place.title} / {addr}")
 
     return "\n".join(lines)
 
 
 def call_llm(system_prompt: str, history: list, message: str) -> str:
-    """CHAT_PROVIDER가 openai든 anthropic이든 같은 인터페이스로 호출"""
     if CHAT_PROVIDER == "openai":
         messages = [{"role": "system", "content": system_prompt}]
         for h in history:
@@ -141,8 +169,8 @@ def call_llm(system_prompt: str, history: list, message: str) -> str:
 
 def get_chat_response(message: str, history: list, db: Session) -> tuple[str, list[int]]:
     post_context, post_ids = get_post_context(db)
-    place_context = get_place_context(db, message)
-    weather_context = get_weather_context(db)
+    weather_text, normalized_weather = get_weather_context(db)
+    place_context = get_place_context(db, message, normalized_weather)
 
     system_prompt = f"""너는 구미 지역 정보 커뮤니티 'LocalHub'의 안내 챗봇이야.
 
@@ -151,20 +179,21 @@ def get_chat_response(message: str, history: list, db: Session) -> tuple[str, li
 [사용자 게시글 - 축제/관광/맛집 정보]
 {post_context}
 
-[공공데이터 - 관광지/맛집/축제 정보]
-{place_context}
+[구미 지역 향후 7일 날씨]
+{weather_text}
 
-[구미 지역 날씨 예보]
-{weather_context}
+[장소 추천 정보 - 현재 날씨에 맞춰 필터링됨]
+{place_context}
 
 답변 작성 규칙:
 - 마크다운 문법(#, ##, **, -, 1. 등)을 절대 쓰지 마. 순수 텍스트 문장으로만 답해.
-- 목록을 보여줄 때도 기호나 번호 없이, "첫 번째로는 ~, 두 번째로는 ~" 처럼 자연스러운 문장으로 이어서 말해.
-- 친근하고 편안한 대화체로 답해. 너무 딱딱하거나 사무적으로 말하지 마.
-- 날씨를 물어보면 위 [구미 지역 날씨 예보]를 참고해서 답해줘. 비/눈 예보가 있으면 실내 활동(관광지/맛집)을, 맑으면 야외 활동(축제/관광지)을 자연스럽게 같이 추천해줘.
-- 이동 거리나 소요 시간은 정확한 정보가 없으니 추측해서 답하지 말고, "정확한 이동 시간은 지도 앱으로 확인해보시는 걸 추천해요"라고 안내해줘.
-- 목록에 없는 내용은 추측하지 말고 "그 정보는 아직 등록되어 있지 않아요"라고 자연스럽게 안내해.
-- 답변은 3~5문장 정도로 간결하게 정리해줘.
+- 목록을 보여줄 때도 기호나 번호 없이 자연스러운 문장으로 이어서 말해.
+- 친근하고 편안한 대화체로 답해.
+- 날씨를 물어보면 [구미 지역 향후 7일 날씨]를 참고해서 답해줘. 특정 날짜를 물어보면 해당 날짜 줄을 찾아서 답하고, "이번주 비오는 날" 같은 질문엔 목록에서 비 예보 있는 날짜만 추려서 답해줘.
+- 장소를 추천할 땐 이미 현재 날씨에 맞게 걸러진 목록이니, 그 이유(비 와서 실내 위주 등)를 자연스럽게 곁들여줘.
+- 이동 거리나 소요 시간은 정확한 정보가 없으니 "정확한 이동 시간은 지도 앱으로 확인해보시는 걸 추천해요"라고 안내해줘.
+- 목록에 없는 내용은 추측하지 말고 "그 정보는 아직 등록되어 있지 않아요"라고 안내해.
+- 답변은 3~5문장 정도로 간결하게.
 """
 
     reply = call_llm(system_prompt, history, message)
