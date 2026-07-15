@@ -12,12 +12,20 @@ venv/
 # Python 캐시
 __pycache__/
 *.py[cod]
+*.egg-info/
 
 # SQLite
 *.db
 *.db-journal
 *.db-shm
 *.db-wal
+
+# 로그
+*.log
+
+# 테스트/커버리지
+.pytest_cache/
+.coverage
 
 # IDE
 .vscode/
