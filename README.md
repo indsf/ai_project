@@ -40,6 +40,11 @@ app/modules/places/
 
 ## API
 
+`/docs` 열면 상단에 카테고리 표/태그 표가 자동으로 정리돼서 나옵니다 (categories.py, weather_tags.py의
+딕셔너리를 그대로 읽어서 렌더링하는 거라 카테고리/태그를 추가해도 문서가 따로 손 안 대도 같이 갱신됨).
+posts의 category/indoor_outdoor는 Enum이라 Swagger에서 드롭다운으로 뜨고, 잘못된 값 보내면 422로
+막힙니다. 모든 요청/응답 스키마에 예시값도 넣어놔서 "Try it out" 누르면 바로 그럴싸한 값이 채워져있음.
+
 ### 커뮤니티 (`/api/posts`)
 | Method | Path | 설명 |
 |---|---|---|

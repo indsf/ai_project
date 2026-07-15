@@ -31,3 +31,17 @@ SLUG_TO_CONTENT_TYPE: dict[str, str] = {
 def slug_for(content_type_id: str) -> str:
     meta = CONTENT_TYPE_REGISTRY.get(str(content_type_id))
     return meta["slug"] if meta else "unknown"
+
+
+def category_docs_table() -> str:
+    """API 문서용 마크다운 표. 카테고리 추가/삭제 시 자동으로 같이 갱신된다."""
+    rows = "\n".join(
+        f"| `{meta['slug']}` | {meta['label']} |"
+        for meta in CONTENT_TYPE_REGISTRY.values()
+    )
+    return "| category 값 | 의미 |\n|---|---|\n" + rows
+
+
+def category_slugs_csv() -> str:
+    """Query 파라미터 설명에 넣을 슬러그 나열 문자열. 예: 'attractions, culture, festivals, ...'"""
+    return ", ".join(meta["slug"] for meta in CONTENT_TYPE_REGISTRY.values())

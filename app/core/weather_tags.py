@@ -11,12 +11,20 @@
 from typing import Iterable
 
 # 태그 어휘 (MVP 최소 셋)
-# - indoor / outdoor : 장소의 기본 성격
-# - rain   : 비/악천후에도 갈만한 곳 (기본적으로 indoor에 부여)
-# - hot    : 더운 날 가기 좋은 곳 (indoor 전체 + 계곡/워터파크 등 야외 물놀이)
-# - cold   : 추운 날 가기 좋은 곳 (indoor 전체 + 온천/찜질방 등)
-# - sunny  : 맑고 화창할 때 가기 좋은 야외 명소
-# - any_weather : 날씨 상관없이 항상 갈만한 곳 (숙박)
+# 이 딕셔너리가 이 프로젝트에서 쓰이는 태그의 "정본" 목록이다.
+# API 문서(FastAPI description)에서도 이 딕셔너리를 그대로 읽어서 보여주므로,
+# 태그를 추가/삭제할 땐 여기만 고치면 문서도 자동으로 같이 업데이트된다.
+TAG_DESCRIPTIONS: dict[str, str] = {
+    "indoor": "실내 위주 장소 (박물관/쇼핑몰/음식점/숙박 등)",
+    "outdoor": "실외 위주 장소 (자연관광지/등산로/캠핑장/야외 축제 등)",
+    "rain": "비/악천후에도 갈만한 곳 (기본적으로 indoor에 자동 부여)",
+    "hot": "더운 날 가기 좋은 곳 (indoor 전체 + 계곡/워터파크 등 야외 물놀이)",
+    "cold": "추운 날 가기 좋은 곳 (indoor 전체 + 온천/찜질방 등)",
+    "sunny": "맑고 화창할 때 가기 좋은 야외 명소",
+    "any_weather": "날씨 상관없이 항상 갈만한 곳 (숙박)",
+}
+
+TAG_VOCABULARY: tuple[str, ...] = tuple(TAG_DESCRIPTIONS.keys())
 
 CONTENT_TYPE_DEFAULT = {
     "12": "outdoor",  # 관광지 - 자연/유적 등 야외 비중이 높음
@@ -108,3 +116,14 @@ def decode_tags(raw: str | None) -> list[str]:
     if not raw:
         return []
     return [t for t in raw.split(",") if t]
+
+
+def tag_docs_table() -> str:
+    """API 문서용 마크다운 표. 태그 추가/삭제 시 자동으로 같이 갱신된다."""
+    rows = "\n".join(f"| `{tag}` | {desc} |" for tag, desc in TAG_DESCRIPTIONS.items())
+    return "| 태그 값 | 의미 |\n|---|---|\n" + rows
+
+
+def tag_vocabulary_csv() -> str:
+    """Query 파라미터 설명에 넣을 태그 나열 문자열. 예: 'indoor, outdoor, rain, ...'"""
+    return ", ".join(TAG_VOCABULARY)
