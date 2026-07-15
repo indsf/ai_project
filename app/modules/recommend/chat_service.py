@@ -139,7 +139,7 @@ def call_llm(system_prompt: str, history: list, message: str) -> str:
         messages.append({"role": "user", "content": message})
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5-mini",
             messages=messages,
             timeout=15,
         )
