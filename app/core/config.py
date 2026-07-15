@@ -8,10 +8,11 @@ from dotenv import load_dotenv
 # 프로젝트 루트의 .env 파일을 읽는다.
 load_dotenv()
 
-# 축제 원본 데이터(TourAPI) 위치. 기본값은 app/data 폴더 안의 파일.
-FESTIVAL_DATA_PATH = Path(
+# TourAPI 원본 데이터(8개 카테고리 JSON)가 들어있는 디렉터리. 기본값은 app/data.
+# 파일명은 app/modules/places/categories.py의 CONTENT_TYPE_REGISTRY에서 관리한다.
+PLACES_DATA_DIR = Path(
     os.getenv(
-        "FESTIVAL_DATA_PATH",
-        str(Path(__file__).resolve().parent.parent / "data" / "구미_경북권_축제공연행사.json"),
+        "PLACES_DATA_DIR",
+        str(Path(__file__).resolve().parent.parent / "data"),
     )
 )

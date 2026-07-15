@@ -1,12 +1,13 @@
-# app/modules/festival/schemas.py
+# app/modules/places/schemas.py
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
 
-class FestivalListItem(BaseModel):
+class PlaceListItem(BaseModel):
     content_id: str
+    category: str
     title: str
     addr1: Optional[str] = None
     image_url: Optional[str] = None
@@ -17,15 +18,16 @@ class FestivalListItem(BaseModel):
         from_attributes = True
 
 
-class FestivalListResponse(BaseModel):
+class PlaceListResponse(BaseModel):
     total: int
     page: int
     size: int
-    items: List[FestivalListItem]
+    items: List[PlaceListItem]
 
 
-class FestivalDetail(BaseModel):
+class PlaceDetail(BaseModel):
     content_id: str
+    category: str
     title: str
     addr1: Optional[str] = None
     addr2: Optional[str] = None
@@ -41,6 +43,6 @@ class FestivalDetail(BaseModel):
         from_attributes = True
 
 
-class FestivalSeedResponse(BaseModel):
+class PlaceSeedResponse(BaseModel):
     message: str
-    count: int
+    counts: Dict[str, int]  # 카테고리 슬러그 -> 적재 건수

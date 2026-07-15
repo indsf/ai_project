@@ -1,25 +1,31 @@
-# app/modules/festival/models.py
-# 한국관광공사 TourAPI(축제공연행사) 원본 데이터를 담는 테이블
+# app/modules/places/models.py
+# 관광지/레포츠/문화시설/쇼핑/숙박/여행코스/음식점/축제공연행사를 전부 담는 통합 테이블.
+# TourAPI 8개 카테고리가 필드 구조는 완전히 동일해서(SCHEMA.md 참고) 테이블은 하나로 두고
+# content_type_id로 구분한다. 검색/태그필터/거리순 정렬 로직을 8번 복붙하지 않기 위함.
 
 from typing import List
 
 from sqlalchemy import Column, DateTime, Float, Integer, String, func
 
 from app.core.database import Base
+from app.modules.places.categories import slug_for
 
 
-class Festival(Base):
+class Place(Base):
     """
-    한국관광공사 TourAPI 축제공연행사(contentTypeId=15) 데이터.
+    한국관광공사 TourAPI 원본 데이터(관광지/레포츠/문화시설/쇼핑/숙박/여행코스/음식점/축제공연행사).
     공공누리 제3유형(출처표시, 변경금지) 데이터이므로 원본 필드값은 가공하지 않고 그대로 저장한다.
     """
 
-    __tablename__ = "festivals"
+    __tablename__ = "places"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    # TourAPI 원본 고유 ID (contentid). 재수집 시 upsert 기준 키.
+    # TourAPI 원본 고유 ID (contentid). 카테고리 상관없이 전역에서 유일. 재수집 시 upsert 기준 키.
     content_id = Column(String(20), unique=True, nullable=False, index=True)
+
+    # TourAPI contentTypeId 원본 값 ("12","14","15","25","28","32","38","39")
+    content_type_id = Column(String(5), nullable=False, index=True)
 
     title = Column(String(200), nullable=False, index=True)
     addr1 = Column(String(255), nullable=True)
@@ -53,3 +59,8 @@ class Festival(Base):
         from app.core.weather_tags import decode_tags
 
         return decode_tags(self.tags_raw)
+
+    @property
+    def category(self) -> str:
+        """content_type_id를 사람이 읽기 좋은 슬러그로 변환 (예: '15' -> 'festivals')."""
+        return slug_for(self.content_type_id)
