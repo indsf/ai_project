@@ -1,9 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.database import Base, engine
-from app.modules.posts import models as posts_models  # Base.metadata에 테이블 등록되도록 import 필요
+
+from app.core.database import Base, SessionLocal, engine
+
+from app.modules.posts import models as posts_models  # noqa: F401
 from app.modules.posts.router import router as posts_router
+
+from app.modules.recommend import place_models  # noqa: F401
+from app.modules.recommend import weather_models  # noqa: F401
 from app.modules.recommend.router import router as recommend_router
+
+from app.modules.festival import models as festival_models  # noqa: F401
+from app.modules.festival.router import router as festival_router
+from app.modules.festival.service import seed_festivals
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,6 +27,17 @@ app.add_middleware(
 
 app.include_router(posts_router)
 app.include_router(recommend_router)
+app.include_router(festival_router)
+
+
+@app.on_event("startup")
+def _seed_festival_data() -> None:
+    """서버 기동 시 TourAPI 축제 데이터를 자동으로 적재한다(upsert라 반복 실행해도 안전)."""
+    db = SessionLocal()
+    try:
+        seed_festivals(db)
+    finally:
+        db.close()
 
 
 @app.get("/")
